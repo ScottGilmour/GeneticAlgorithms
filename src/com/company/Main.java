@@ -16,9 +16,11 @@ public class Main {
     private static int GENERATIONS = 35;
     private static Random rand = new Random();
 
+    /**
+     * Main entry point
+     * @param args
+     */
     public static void main(String[] args) {
-        //Step one
-        //Create random chromosomes to test with
         List<Chromosome> chromosomeList = new ArrayList<Chromosome>();
         List<Chromosome> generation = new ArrayList<Chromosome>();
 
@@ -36,7 +38,7 @@ public class Main {
             List<Chromosome> oldGeneration = generationalList.get(generationalList.size()-1);
             List<Chromosome> newGeneration = new ArrayList<Chromosome>();
 
-            //While the latest generation is not yet at ten members
+            //While the latest generation is not yet at n members
             while (newGeneration.size() < POPULATION) {
                 newGeneration.addAll(breed(oldGeneration));
             }
@@ -48,7 +50,7 @@ public class Main {
             System.out.println("Generation " + generations);
         }
 
-
+        //Print top one hundred entries
         Collections.sort(generationalList.get(generationalList.size()-1), new CustomComparator());
         for (int i = 0; i < 100; i++) {
             System.out.println(generationalList.get(generationalList.size()-1).get(i));
@@ -56,6 +58,11 @@ public class Main {
 
     }
 
+    /**
+     * Returns a list of two newly created chromosomes from a list of inital chromosomes (old generation)
+     * @param chromosomes
+     * @return
+     */
     private static List<Chromosome> breed(List<Chromosome> chromosomes) {
         if (chromosomes.isEmpty()) {
             fillWithRandomChromosomes(chromosomes);
@@ -63,9 +70,9 @@ public class Main {
 
         //Step three
         Collections.sort(chromosomes, new CustomComparator());
-
         Chromosome chromosomeOne = new Chromosome(), chromosomeTwo = new Chromosome();
 
+        //Roulette wheel implementation
         chromosomeOne = selectChromosome(chromosomes);
         chromosomeTwo = selectChromosome(chromosomes);
 
@@ -80,6 +87,11 @@ public class Main {
         return returnList;
     }
 
+    /**
+     * Roulette wheel selection process
+     * @param chromosomes
+     * @return
+     */
     private static Chromosome selectChromosome(List<Chromosome> chromosomes) {
         double totalFitness = 0.0, loopTotal = 0.0;
         for (Chromosome chromosome : chromosomes) {
@@ -98,11 +110,15 @@ public class Main {
         return chromosomes.get(chromosomes.size()-1);
     }
 
+    /**
+     * Randomly generates initial population
+     * @param chromosomeList
+     */
     private static void fillWithRandomChromosomes(List<Chromosome> chromosomeList) {
         for (int i = 0; i < POPULATION; i++) {
             Chromosome c = new Chromosome();
 
-            //Each chromosome contains 5 genes, create 5 random genes
+            //Each chromosome contains word.length genes, create word.length random genes
             for (int j = 0; j < WORD.length(); j++) {
                 //Each gene has a value between 1 and 26 representing a letter
                 Gene g = new Gene();
@@ -121,6 +137,11 @@ public class Main {
         }
     }
 
+    /**
+     * Crossover, randomly select a split and swap every value from there on
+     * @param src
+     * @param dest
+     */
     private static void crossover(Chromosome src, Chromosome dest) {
         if (rand.nextDouble() > CROSSOVER) {
             int pos = randInt(1, WORD.length());
@@ -132,6 +153,11 @@ public class Main {
         }
     }
 
+    /**
+     * Every gene in every chromosome has a small minute chance to mutate to any other possible value
+     * @param chromosome
+     * @return
+     */
     private static Chromosome mutate(Chromosome chromosome) {
         for (Gene gene : chromosome.getComposition()) {
             if (randInt(0, 100) < MUTATION) {
@@ -144,6 +170,11 @@ public class Main {
         return chromosome;
     }
 
+    /**
+     * Fitness function, determines how close to the correct word the chromosome is, ideally an exact match is 0.
+     * @param chromosome
+     * @return
+     */
     public static double getFitnessScore(Chromosome chromosome) {
         int[] results = new int[WORD.length()];
 
