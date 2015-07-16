@@ -3,17 +3,14 @@ package com.company;
 import com.company.models.Chromosome;
 import com.company.models.Gene;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 public class Main {
-    private static String WORD = "apple";
-    private static double MUTATION = 5;
-    private static double CROSSOVER = .7;
-    private static int POPULATION = 500;
-    private static int GENERATIONS = 35;
+    private static String WORD = "scottygreat";
+    private static double MUTATION = 0.02;
+    private static double CROSSOVER = 0.55;
+    private static int POPULATION = 64;
+    private static int GENERATIONS = 100000;
     private static Random rand = new Random();
 
     /**
@@ -21,41 +18,63 @@ public class Main {
      * @param args
      */
     public static void main(String[] args) {
-        List<Chromosome> chromosomeList = new ArrayList<Chromosome>();
         List<Chromosome> generation = new ArrayList<Chromosome>();
-
-        List<List<Chromosome>> generationalList = new ArrayList<List<Chromosome>>();
 
         int generations = 0;
 
-        while (generation.size() < POPULATION) {
-            generation.addAll(breed(chromosomeList));
-        }
-        generationalList.add(generation);
-
+        fillWithRandomChromosomes(generation);
+        evaluate(generation);
 
         while (generations < GENERATIONS) {
-            List<Chromosome> oldGeneration = generationalList.get(generationalList.size()-1);
             List<Chromosome> newGeneration = new ArrayList<Chromosome>();
 
-            //While the latest generation is not yet at n members
-            while (newGeneration.size() < POPULATION) {
-                newGeneration.addAll(breed(oldGeneration));
+            //Loop through generation
+            for (int i = 0; newGeneration.size() < POPULATION; i++) {
+                newGeneration.addAll(breed(generation));
             }
 
-            newGeneration.addAll(oldGeneration);
-            generationalList.add(newGeneration);
+            evaluate(generation);
 
+            Collections.sort(generation, new CustomComparator());
+
+            //Elitism
+            newGeneration.add(generation.get(0));
+            generation.clear();
+            generation.addAll(newGeneration);
             generations++;
-            System.out.println("Generation " + generations);
+
+            Collections.sort(generation, new CustomComparator());
+
+            double totalFit = 0;
+            for (Chromosome chromosome : generation) {
+                totalFit = totalFit + chromosome.getFitness();
+            }
+
+            System.out.println("Generation " + generations + " Elite " + generation.get(0) + " FitAvg " + (totalFit / generation.size()));
+
+            if (generation.get(0).getFitness() <= 0.03)
+                break;
         }
 
-        //Print top one hundred entries
-        Collections.sort(generationalList.get(generationalList.size()-1), new CustomComparator());
-        for (int i = 0; i < 100; i++) {
-            System.out.println(generationalList.get(generationalList.size()-1).get(i));
+        //Print top ten entries
+        Collections.sort(generation, new CustomComparator());
+        for (int i = 10; i >= 0; i--) {
+            System.out.println(generation.get(i));
         }
 
+    }
+
+    private static void evaluate(List<Chromosome> generation) {
+        for (Chromosome chromosome : generation) {
+            chromosome.setFitness(getFitnessScore(chromosome));
+        }
+    }
+
+    private static void cullDuplicates(List<Chromosome> newGeneration) {
+        Set<Chromosome> hs = new HashSet<Chromosome>();
+        hs.addAll(newGeneration);
+        newGeneration.clear();
+        newGeneration.addAll(hs);
     }
 
     /**
@@ -64,25 +83,24 @@ public class Main {
      * @return
      */
     private static List<Chromosome> breed(List<Chromosome> chromosomes) {
-        if (chromosomes.isEmpty()) {
-            fillWithRandomChromosomes(chromosomes);
-        }
+        List<Chromosome> returnList = new ArrayList<Chromosome>();
 
         //Step three
+        Chromosome chromosomeOne = new Chromosome(),
+                   chromosomeTwo = new Chromosome(),
+                   chromosomeChild = new Chromosome();
+
         Collections.sort(chromosomes, new CustomComparator());
-        Chromosome chromosomeOne = new Chromosome(), chromosomeTwo = new Chromosome();
 
         //Roulette wheel implementation
         chromosomeOne = selectChromosome(chromosomes);
         chromosomeTwo = selectChromosome(chromosomes);
 
-        crossover(chromosomeOne, chromosomeTwo);
-        chromosomeOne = mutate(chromosomeOne);
-        chromosomeTwo = mutate(chromosomeTwo);
+        chromosomeChild = crossover(chromosomeOne, chromosomeTwo);
+        chromosomeChild = mutate(chromosomeChild);
+        chromosomeChild.setFitness(getFitnessScore(chromosomeChild));
 
-        List<Chromosome> returnList = new ArrayList<Chromosome>();
-        returnList.add(chromosomeOne);
-        returnList.add(chromosomeTwo);
+        returnList.add(chromosomeChild);
 
         return returnList;
     }
@@ -93,6 +111,7 @@ public class Main {
      * @return
      */
     private static Chromosome selectChromosome(List<Chromosome> chromosomes) {
+
         double totalFitness = 0.0, loopTotal = 0.0;
         for (Chromosome chromosome : chromosomes) {
             totalFitness = totalFitness + chromosome.getFitness();
@@ -100,8 +119,7 @@ public class Main {
 
         double random = totalFitness * rand.nextDouble();
 
-        //Loop till we find the correct chromosome
-        for (int i = chromosomes.size() - 1; i >= 0; i--) {
+        for (int i = 0; i < chromosomes.size(); i++) {
             loopTotal += chromosomes.get(i).getFitness();
             if (loopTotal >= random) {
                 return chromosomes.get(i);
@@ -131,10 +149,7 @@ public class Main {
 
             chromosomeList.add(c);
         }
-
-        for (Chromosome chromosome : chromosomeList) {
-            chromosome.setFitness(getFitnessScore(chromosome));
-        }
+        cullDuplicates(chromosomeList);
     }
 
     /**
@@ -142,15 +157,50 @@ public class Main {
      * @param src
      * @param dest
      */
-    private static void crossover(Chromosome src, Chromosome dest) {
-        if (rand.nextDouble() > CROSSOVER) {
-            int pos = randInt(1, WORD.length());
+    private static Chromosome crossover(Chromosome src, Chromosome dest) {
+        Chromosome resultChromo = new Chromosome();
 
-            for (int i = pos; i < WORD.length(); i++) {
-                src.getComposition().get(i).setValue(dest.getComposition().get(i).getValue());
-                src.getComposition().get(i).setMeaning(dest.getComposition().get(i).getMeaning());
+        if (rand.nextDouble() < CROSSOVER) {
+            String binaryOne = src.getBinary().trim();
+            String binaryTwo = dest.getBinary().trim();
+            String resultBinary = "";
+
+            binaryOne = binaryOne.replace(" ", "");
+            binaryTwo = binaryTwo.replace(" ", "");
+
+            int pos = randInt(1, binaryOne.length() - 1);
+
+            String holder = binaryTwo.substring(pos, binaryTwo.length());
+            String holderB = binaryOne.substring(0, pos);
+
+            resultBinary = holder + holderB;
+
+            resultBinary = formatBinary(resultBinary);
+
+            resultChromo.setBinary(resultBinary);
+        } else {
+            if (randInt(0, 100) > 50) {
+                resultChromo.setBinary(src.getBinary().trim());
+            } else {
+                resultChromo.setBinary(dest.getBinary().trim());
             }
         }
+
+        return resultChromo;
+    }
+
+    private static String formatBinary(String binary) {
+        String newBinary = "";
+        for (int i = 0; i < binary.length(); i++) {
+            if (i >= 8) {
+                if (i % 8 == 0) {
+                    newBinary += " ";
+                }
+            }
+            newBinary += binary.charAt(i);
+        }
+
+        return newBinary;
     }
 
     /**
@@ -159,13 +209,22 @@ public class Main {
      * @return
      */
     private static Chromosome mutate(Chromosome chromosome) {
-        for (Gene gene : chromosome.getComposition()) {
-            if (randInt(0, 100) < MUTATION) {
-                gene.setValue(randInt(1, 26));
-                gene.setMeaning(getCharForInt(gene.getValue()));
+        String binaryString = chromosome.getBinary().trim().replace(" ", "");
+        char[] binaryArray = binaryString.toCharArray();
+
+        for (int i = 0; i < binaryArray.length; i++) {
+            if (rand.nextDouble() < MUTATION) {
+                if (binaryArray[i] == '0') {
+                    binaryArray[i] = '1';
+                } else {
+                    binaryArray[i] = '0';
+                }
             }
         }
 
+        binaryString = new String(binaryArray);
+        binaryString = formatBinary(binaryString);
+        chromosome.setBinary(binaryString);
 
         return chromosome;
     }
@@ -177,23 +236,25 @@ public class Main {
      */
     public static double getFitnessScore(Chromosome chromosome) {
         int[] results = new int[WORD.length()];
+        int addition = WORD.length();
 
         //For each gene determine how far it is from the correct letter
         for (int i = 0; i < chromosome.getComposition().size(); i++) {
-            results[i] = getIntForChar(WORD.charAt(i)) - chromosome.getComposition().get(i).getValue();
+            results[i] = (getIntForChar(WORD.charAt(i)) - chromosome.getComposition().get(i).getValue()) * 2;
+            if (results[i] == 0)
+                addition--;
         }
 
-        double score = 0;
+        double score = addition;
         for (int result : results) {
             if (result < 0) result = result * -1;
             score = score + result;
         }
-
         score = score / 100;
         return score;
     }
 
-    private static int getIntForChar(char c) {
+    public static int getIntForChar(char c) {
         switch (c) {
             case 'a':
                 return 1;
@@ -247,12 +308,12 @@ public class Main {
                 return 25;
             case 'z':
                 return 26;
+            default:
+                return 999;
         }
-
-        return 99;
     }
 
-    private static char getCharForInt(int value) {
+    public static char getCharForInt(int value) {
         switch (value) {
             case 1:
                 return 'a';
@@ -306,9 +367,9 @@ public class Main {
                 return 'y';
             case 26:
                 return 'z';
+            default:
+                return 'z';
         }
-
-        return 'z';
     }
 
     public static int randInt(int min, int max) {
