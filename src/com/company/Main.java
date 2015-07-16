@@ -6,10 +6,10 @@ import com.company.models.Gene;
 import java.util.*;
 
 public class Main {
-    private static String WORD = "scottygreat";
-    private static double MUTATION = 0.02;
+    private static String WORD = "aaabbbccc";
+    private static double MUTATION = 0.002;
     private static double CROSSOVER = 0.55;
-    private static int POPULATION = 64;
+    private static int POPULATION = 32;
     private static int GENERATIONS = 100000;
     private static Random rand = new Random();
 
@@ -28,7 +28,7 @@ public class Main {
         while (generations < GENERATIONS) {
             List<Chromosome> newGeneration = new ArrayList<Chromosome>();
 
-            //Loop through generation
+            //Create population
             for (int i = 0; newGeneration.size() < POPULATION; i++) {
                 newGeneration.addAll(breed(generation));
             }
